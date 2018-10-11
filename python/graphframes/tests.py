@@ -161,6 +161,46 @@ class GraphFrameTest(GraphFrameTestCase):
         assert motifs.count() == 3
         self.assertSetEqual(set(motifs.columns), {"a", "e", "b"})
 
+    def test_filterVertices(self):
+        g = self.g
+        conditions = ["id < 3", g.vertices.id < 3]
+        expected_v = [(1, "A"), (2, "B")]
+        expected_e = [(1, 2, "love"), (2, 1, "hate")]
+        for cond in conditions:
+            g2 = g.filterVertices(cond)
+            v2 = g2.vertices.select("id", "name").collect()
+            e2 = g2.edges.select("src", "dst", "action").collect()
+            assert len(v2) == len(expected_v)
+            assert len(e2) == len(expected_e)
+            self.assertSetEqual(set(v2), set(expected_v))
+            self.assertSetEqual(set(e2), set(expected_e))
+
+    def test_filterEdges(self):
+        g = self.g
+        conditions = ["dst > 2", g.edges.dst > 2]
+        expected_v = [(1, "A"), (2, "B"), (3, "C")]
+        expected_e = [(2, 3, "follow")]
+        for cond in conditions:
+            g2 = g.filterEdges(cond)
+            v2 = g2.vertices.select("id", "name").collect()
+            e2 = g2.edges.select("src", "dst", "action").collect()
+            assert len(v2) == len(expected_v)
+            assert len(e2) == len(expected_e)
+            self.assertSetEqual(set(v2), set(expected_v))
+            self.assertSetEqual(set(e2), set(expected_e))
+
+    def test_dropIsolatedVertices(self):
+        g = self.g
+        g2 = g.filterEdges("dst > 2").dropIsolatedVertices()
+        v2 = g2.vertices.select("id", "name").collect()
+        e2 = g2.edges.select("src", "dst", "action").collect()
+        expected_v = [(2, "B"), (3, "C")]
+        expected_e = [(2, 3, "follow")]
+        assert len(v2) == len(expected_v)
+        assert len(e2) == len(expected_e)
+        self.assertSetEqual(set(v2), set(expected_v))
+        self.assertSetEqual(set(e2), set(expected_e))
+
     def test_bfs(self):
         g = self.g
         paths = g.bfs("name='A'", "name='C'")
@@ -263,12 +303,8 @@ class GraphFrameLibTest(GraphFrameTestCase):
         comps_tests = []
         comps_tests += [g.connectedComponents()]
         comps_tests += [g.connectedComponents(broadcastThreshold=1)]
-
-        # [#194] Prior to Apache Spark version 2.0, no checkpoint or large checkpoint interval
-        #        causes the test to run for too long, resulting in Travis CI to abort the build
-        if GraphFrameTestUtils.spark_at_least_of_version("2.0"):
-            comps_tests += [g.connectedComponents(checkpointInterval=0)]
-            comps_tests += [g.connectedComponents(checkpointInterval=10)]
+        comps_tests += [g.connectedComponents(checkpointInterval=0)]
+        comps_tests += [g.connectedComponents(checkpointInterval=10)]
         comps_tests += [g.connectedComponents(algorithm="graphx")]
         for c in comps_tests:
             self.assertEqual(c.groupBy("component").count().count(), 2)
@@ -293,8 +329,6 @@ class GraphFrameLibTest(GraphFrameTestCase):
         self._hasCols(pr, vcols=['id', 'pagerank'], ecols=['src', 'dst', 'weight'])
 
     def test_parallel_personalized_page_rank(self):
-        if not GraphFrameTestUtils.spark_at_least_of_version("2.1"):
-            self.skipTest("Parallel Personalized PageRank is only available in Apache Spark 2.1+")
         n = 100
         g = self._graph("star", n)
         resetProb = 0.15

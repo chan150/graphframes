@@ -241,17 +241,33 @@ DSL for expressing structural patterns:
       `GraphFrame.vertices`. Similarly, an edge `e` in a motif will produce a column "e"
       in the result `DataFrame` with sub-fields equivalent to the schema (columns) of
       `GraphFrame.edges`.
+  * Be aware that names do *not* identify *distinct* elements: two elements with different
+      names may refer to the same graph element.  For example, in the motif
+      `"(a)-[e]->(b); (b)-[e2]->(c)"`, the names `a` and `c` could refer to the same vertex.
+      To restrict named elements to be distinct vertices or edges, use post-hoc filters
+      such as `resultDataframe.filter("a.id != c.id")`.
 * It is acceptable to omit names for vertices or edges in motifs when not needed.
    E.g., `"(a)-[]->(b)"` expresses an edge between vertices `a,b` but does not assign a name
    to the edge.  There will be no column for the anonymous edge in the result `DataFrame`.
    Similarly, `"(a)-[e]->()"` indicates an out-edge of vertex `a` but does not name
-   the destination vertex.
+   the destination vertex.  These are called *anonymous* vertices and edges.
 * An edge can be negated to indicate that the edge should *not* be present in the graph.
   E.g., `"(a)-[]->(b); !(b)-[]->(a)"` finds edges from `a` to `b` for which there is *no*
   edge from `b` to `a`.
 
+Restrictions:
+
+* Motifs are not allowed to contain edges without any named elements: `"()-[]->()"` and
+    `"!()-[]->()"` are prohibited terms.
+* Motifs are not allowed to contain named edges within negated terms (since these named
+    edges would never appear within results).  E.g., `"!(a)-[ab]->(b)"` is invalid, but
+    `"!(a)-[]->(b)"` is valid.
+
 More complex queries, such as queries which operate on vertex or edge attributes,
 can be expressed by applying filters to the result `DataFrame`.
+
+This can return duplicate rows.  E.g., a query `"(u)-[]->()"` will return a result for each
+matching edge, even if those edges share the same vertex `u`.
 
 <div class="codetabs">
 
@@ -341,7 +357,7 @@ chainWith2Friends2.show()
 
 <div data-lang="python"  markdown="1">
 {% highlight python %}
-from pyspark.sql.functions import col, lit, udf, when
+from pyspark.sql.functions import col, lit, when
 from pyspark.sql.types import IntegerType
 from graphframes.examples import Graphs
 g = Graphs(sqlContext).friends()  # Get example graph
@@ -375,7 +391,8 @@ In GraphX, the `subgraph()` method takes an edge triplet (edge, src vertex, and 
 attributes) and allows the user to select a subgraph based on triplet and vertex filters.
 
 GraphFrames provide an even more powerful way to select subgraphs based on a combination of
-motif finding and DataFrame filters.
+motif finding and DataFrame filters. We provide three helper methods for subgraph selection.
+`filterVertices(condition)`, `filterEdges(condition)`, and `dropIsolatedVertices()`.
 
 **Simple subgraph: vertex and edge filters**:
 The following example shows how to select a subgraph based upon vertex and edge filters.
@@ -387,10 +404,10 @@ The following example shows how to select a subgraph based upon vertex and edge 
 import org.graphframes.{examples,GraphFrame}
 val g: GraphFrame = examples.Graphs.friends
 
-// Select subgraph of users older than 30, and edges of type "friend"
-val v2 = g.vertices.filter("age > 30")
-val e2 = g.edges.filter("relationship = 'friend'")
-val g2 = GraphFrame(v2, e2)
+// Select subgraph of users older than 30, and relationships of type "friend".
+// Drop isolated vertices (users) which are not contained in any edges (relationships).
+val g1 = g.filterVertices("age > 30").filterEdges("relationship = 'friend'").dropIsolatedVertices()
+
 {% endhighlight %}
 </div>
 
@@ -399,10 +416,10 @@ val g2 = GraphFrame(v2, e2)
 from graphframes.examples import Graphs
 g = Graphs(sqlContext).friends()  # Get example graph
 
-# Select subgraph of users older than 30, and edges of type "friend"
-v2 = g.vertices.filter("age > 30")
-e2 = g.edges.filter("relationship = 'friend'")
-g2 = GraphFrame(v2, e2)
+# Select subgraph of users older than 30, and relationships of type "friend".
+# Drop isolated vertices (users) which are not contained in any edges (relationships).
+g1 = g.filterVertices("age > 30").filterEdges("relationship = 'friend'").dropIsolatedVertices()
+
 {% endhighlight %}
 </div>
 
@@ -461,7 +478,7 @@ g2 = GraphFrame(g.vertices, e2)
 
 GraphFrames provides the same suite of standard graph algorithms as GraphX, plus some new ones.
 We provide brief descriptions and code snippets below.
-See the [API docs](api/scala/index.html#org.graphframes.lib) for more details.
+See the [API docs](api/scala/index.html#org.graphframes.lib.package) for more details.
 
 Some of the algorithms are currently wrappers around GraphX implementations, so they may not be
 more scalable than GraphX.  More algorithms will be migrated to native GraphFrames implementations
@@ -477,7 +494,8 @@ See [Wikipedia on BFS](https://en.wikipedia.org/wiki/Breadth-first_search) for m
 
 <div class="codetabs">
 
-The following code snippets search for people connected to the user "Bob."
+The following code snippets uses BFS to find path between
+vertex with name "Esther" to a vertex with age < 32.
 
 <div data-lang="scala"  markdown="1">
 
@@ -487,7 +505,7 @@ For API details, refer to the [API docs](api/scala/index.html#org.graphframes.li
 import org.graphframes.{examples,GraphFrame}
 val g: GraphFrame = examples.Graphs.friends  // get example graph
 
-// Search from "Esther" for users of age <= 32.
+// Search from "Esther" for users of age < 32.
 val paths = g.bfs.fromExpr("name = 'Esther'").toExpr("age < 32").run()
 paths.show()
 
@@ -679,7 +697,6 @@ val results2 = g.pageRank.resetProbability(0.15).maxIter(10).run()
 val results3 = g.pageRank.resetProbability(0.15).maxIter(10).sourceId("a").run()
 
 // Run PageRank personalized for vertex ["a", "b", "c", "d"] in parallel
-// Works only in Spark 2.1+
 val results3 = g.parallelPersonalizedPageRank.resetProbability(0.15).maxIter(10).sourceIds(Array("a", "b", "c", "d")).run()
 {% endhighlight %}
 </div>

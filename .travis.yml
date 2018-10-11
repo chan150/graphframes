@@ -6,28 +6,25 @@ cache:
     - $HOME/.sbt/launchers/
     - $HOME/.cache/spark-versions
 
+language: scala
+
+scala:
+   - 2.11.8
+
 env:
   global:
     - SCALA_VERSION=2.11.8
 
 matrix:
   include:
-    - jdk: openjdk7 # openJDK crashes sometimes
-      env: PYSPARK_PYTHON=python2 SPARK_VERSION=2.0.2 SPARK_BUILD="spark-${SPARK_VERSION}-bin-hadoop2.7"
     - jdk: oraclejdk8
-      env: PYSPARK_PYTHON=python2 SPARK_VERSION=2.1.2 SPARK_BUILD="spark-${SPARK_VERSION}-bin-hadoop2.7"
+      env: PYSPARK_PYTHON=python2 SPARK_VERSION=2.2.2 SPARK_BUILD="spark-${SPARK_VERSION}-bin-hadoop2.7"
     - jdk: oraclejdk8
-      env: PYSPARK_PYTHON=python2 SPARK_VERSION=2.2.1 SPARK_BUILD="spark-${SPARK_VERSION}-bin-hadoop2.7"
+      env: PYSPARK_PYTHON=python2 SPARK_VERSION=2.3.1 SPARK_BUILD="spark-${SPARK_VERSION}-bin-hadoop2.7"
     - jdk: oraclejdk8
-      env: PYSPARK_PYTHON=python2 SPARK_VERSION=2.3.0 SPARK_BUILD="spark-${SPARK_VERSION}-bin-hadoop2.7"
-    - jdk: openjdk7
-      env: PYSPARK_PYTHON=python3 SPARK_VERSION=2.0.2 SPARK_BUILD="spark-${SPARK_VERSION}-bin-hadoop2.7"
+      env: PYSPARK_PYTHON=python3 SPARK_VERSION=2.2.2 SPARK_BUILD="spark-${SPARK_VERSION}-bin-hadoop2.7"
     - jdk: oraclejdk8
-      env: PYSPARK_PYTHON=python3 SPARK_VERSION=2.1.2 SPARK_BUILD="spark-${SPARK_VERSION}-bin-hadoop2.7"
-    - jdk: oraclejdk8
-      env: PYSPARK_PYTHON=python3 SPARK_VERSION=2.2.1 SPARK_BUILD="spark-${SPARK_VERSION}-bin-hadoop2.7"
-    - jdk: oraclejdk8
-      env: PYSPARK_PYTHON=python3 SPARK_VERSION=2.3.0 SPARK_BUILD="spark-${SPARK_VERSION}-bin-hadoop2.7"
+      env: PYSPARK_PYTHON=python3 SPARK_VERSION=2.3.1 SPARK_BUILD="spark-${SPARK_VERSION}-bin-hadoop2.7"
 
 before_install:
  - ./bin/download_travis_dependencies.sh
@@ -42,8 +39,8 @@ install:
     fi
 
 script:
-  - ./build/sbt -Dspark.version=$SPARK_VERSION -Dscala.version=$SCALA_VERSION "set test in assembly := {}" assembly
-  - ./build/sbt -Dspark.version=$SPARK_VERSION -Dscala.version=$SCALA_VERSION coverage test coverageReport
+  - sbt ++$TRAVIS_SCALA_VERSION -Dspark.version=$SPARK_VERSION "set test in assembly := {}" assembly
+  - sbt ++$TRAVIS_SCALA_VERSION -Dspark.version=$SPARK_VERSION coverage test coverageReport
   - SPARK_HOME=$HOME/.cache/spark-versions/$SPARK_BUILD ./python/run-tests.sh
 
 after_success:

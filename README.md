@@ -20,7 +20,7 @@ You will need to set `SPARK_HOME` to your local Spark installation directory.
 
 ## Spark version compatibility
 
-This project is compatible with Spark 1.6+.  However, significant speed improvements have been
+This project is compatible with Spark 2.2+.  However, significant speed improvements have been
 made to DataFrames in more recent versions of Spark, so you may see speedups from using the latest
 Spark version.
 
@@ -45,3 +45,7 @@ We welcome open source contributions as well!
   - Major bug fix: Indexing non-Integer vertex IDs, which is used by algorithms which call GraphX
     under the hood, including PageRank, ConnectedComponents, and others.
   - aggregateMessages for Python API
+- 0.6.0 release
+  - Spark 2.3 support
+  - New filter APIs for selecting subgraphs.
+  - Bug fixes in connected components & motif finding.

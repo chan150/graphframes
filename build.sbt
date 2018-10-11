@@ -1,11 +1,9 @@
 // Your sbt build file. Guides on how to write one can be found at
 // http://www.scala-sbt.org/0.13/docs/index.html
 
-val sparkVer = sys.props.getOrElse("spark.version", "2.3.0")
+val sparkVer = sys.props.getOrElse("spark.version", "2.3.1")
 val sparkBranch = sparkVer.substring(0, 3)
 val defaultScalaVer = sparkBranch match {
-  case "2.0" => "2.11.8"
-  case "2.1" => "2.11.8"
   case "2.2" => "2.11.8"
   case "2.3" => "2.11.8"
   case _ => throw new IllegalArgumentException(s"Unsupported Spark version: $sparkVer.")
@@ -24,8 +22,12 @@ name := "graphframes"
 
 spName := "graphframes/graphframes"
 
+organization := "org.graphframes"
+
+isSnapshot := true
+
 // Don't forget to set the version
-version := s"0.6.0-SNAPSHOT-spark$sparkBranch"
+version := s"0.7.0-spark$sparkBranch${if (isSnapshot.value) "-SNAPSHOT" else ""}"
 
 // All Spark Packages need a license
 licenses := Seq("Apache-2.0" -> url("http://opensource.org/licenses/Apache-2.0"))
@@ -41,24 +43,11 @@ sparkComponents ++= Seq("graphx", "sql", "mllib")
 // add any Spark Package dependencies using spDependencies.
 // e.g. spDependencies += "databricks/spark-avro:0.1"
 
+libraryDependencies += "org.slf4j" % "slf4j-api" % "1.7.16"
+
 libraryDependencies += "org.scalatest" %% "scalatest" % defaultScalaTestVer % "test"
 
-// These versions are ancient, but they cross-compile around scala 2.10 and 2.11.
-// Update them when dropping support for scala 2.10
-libraryDependencies ++= Seq(
-  "com.typesafe.scala-logging" %% "scala-logging-api" % "2.1.2",
-  "com.typesafe.scala-logging" %% "scala-logging-slf4j" % "2.1.2"
-)
-
 parallelExecution := false
-
-unmanagedSourceDirectories in Compile ++=
-  Seq(baseDirectory.value / "src" / "main" / {
-    sparkBranch match {
-      case ver if ver.startsWith("2.0") => "spark-2.0"
-      case _ => "spark-2.x"
-    }
-  })
 
 scalacOptions in (Compile, doc) ++= Seq(
   "-groups",
